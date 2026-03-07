@@ -1,0 +1,87 @@
+#!/bin/bash
+# OpenCode Working Memory - L0 状态层
+# 用法: working-memory <content> [--role <role>] [--importance <0-1>]
+
+set -e
+
+DB_PATH="$HOME/.opencode/memory/memory.db"
+
+# 参数解析
+CONTENT=""
+ROLE="user"
+IMPORTANCE=0.5
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --role|-r)
+      ROLE="$2"
+      shift 2
+      ;;
+    --importance|-i)
+      IMPORTANCE="$2"
+      shift 2
+      ;;
+    --help|-h)
+      echo "用法: working-memory <content> [--role <role>] [--importance <0-1>]"
+      echo ""
+      echo "选项:"
+      echo "  --role, -r         角色 (user/assistant/system, 默认: user)"
+      echo "  --importance, -i   重要性 (0-1, 默认: 0.5)"
+      echo "  --help, -h         显示帮助"
+      echo ""
+      echo "示例:"
+      echo "  working-memory \"用户询问API配置问题\" --role user --importance 0.8"
+      exit 0
+      ;;
+    *)
+      if [ -z "$CONTENT" ]; then
+        CONTENT="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$CONTENT" ]; then
+  echo "错误: 缺少内容参数"
+  echo "用法: working-memory <content> [--role <role>]"
+  exit 1
+fi
+
+# 检查是否有活动会话
+SESSION_ID=$(cat /tmp/opencode_session_id 2>/dev/null || echo "")
+
+if [ -z "$SESSION_ID" ]; then
+  echo "警告: 没有活动会话，自动创建新会话"
+  ~/.opencode/bin/session start > /dev/null
+  SESSION_ID=$(cat /tmp/opencode_session_id)
+fi
+
+# 生成ID和时间戳
+MEMORY_ID="wm_$(date +%Y%m%d_%H%M%S)_$(head -c 4 /dev/urandom | xxd -p)"
+CREATED_AT=$(date -Iseconds)
+
+# 估算token数（简单估算：4字符≈1 token）
+TOKENS=$(($(echo -n "$CONTENT" | wc -c) / 4))
+
+# 转义单引号
+CONTENT_ESCAPED=$(echo "$CONTENT" | sed "s/'/''/g")
+
+# 存储到工作记忆
+sqlite3 "$DB_PATH" <<EOF
+INSERT INTO working_memory (id, session_id, role, content, tokens, created_at, importance)
+VALUES ('$MEMORY_ID', '$SESSION_ID', '$ROLE', '$CONTENT_ESCAPED', $TOKENS, '$CREATED_AT', $IMPORTANCE);
+
+UPDATE sessions SET memory_count = memory_count + 1 WHERE id = '$SESSION_ID';
+EOF
+
+echo "✓ 工作记忆已存储"
+echo "  会话: $SESSION_ID"
+echo "  角色: $ROLE"
+echo "  Token: $TOKENS"
+echo "  重要性: $IMPORTANCE"
+
+# 如果重要性>0.7，标记为需要主动召回
+if (( $(echo "$IMPORTANCE > 0.7" | bc -l) )); then
+  echo "  标记为高重要性，将主动召回"
+fi

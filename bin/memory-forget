@@ -1,0 +1,127 @@
+#!/bin/bash
+# OpenCode Memory Forget Tool
+# Usage: memory-forget <memory-id> [--older <days>] [--confirm]
+
+set -e
+
+DB_PATH="$HOME/.opencode/memory/memory.db"
+
+# 参数解析
+MEMORY_ID=""
+OLDER_DAYS=""
+CONFIRM=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --older|-o)
+      OLDER_DAYS="$2"
+      shift 2
+      ;;
+    --confirm|-c)
+      CONFIRM=true
+      shift
+      ;;
+    --help|-h)
+      echo "用法: memory-forget <memory-id> [选项]"
+      echo ""
+      echo "选项:"
+      echo "  --older, -o <days>  删除N天前的记忆"
+      echo "  --confirm, -c       交互确认"
+      echo "  --help, -h          显示帮助"
+      echo ""
+      echo "示例:"
+      echo "  memory-forget mem_20260301_123456_abcd"
+      echo "  memory-forget --older 180"
+      exit 0
+      ;;
+    *)
+      if [ -z "$MEMORY_ID" ]; then
+        MEMORY_ID="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# 删除旧记忆
+if [ -n "$OLDER_DAYS" ]; then
+  echo "查找 $OLDER_DAYS 天前的记忆..."
+  
+  COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM memories WHERE created_at < datetime('now', '-$OLDER_DAYS days');")
+  
+  if [ "$COUNT" -eq 0 ]; then
+    echo "没有找到符合条件的记忆"
+    exit 0
+  fi
+  
+  if [ "$CONFIRM" = true ]; then
+    echo "将删除 $COUNT 条记忆"
+    read -p "确认删除? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "已取消"
+      exit 0
+    fi
+  fi
+  
+  # 软删除：移动到deleted_memories表
+  sqlite3 "$DB_PATH" <<EOF
+INSERT INTO deleted_memories (id, memory_id, content, deleted_at)
+SELECT 
+  'del_' || id,
+  id,
+  content,
+  datetime('now')
+FROM memories
+WHERE created_at < datetime('now', '-$OLDER_DAYS days');
+
+DELETE FROM memories
+WHERE created_at < datetime('now', '-$OLDER_DAYS days');
+EOF
+  
+  echo "✓ 已删除 $COUNT 条记忆"
+  exit 0
+fi
+
+# 删除指定记忆
+if [ -z "$MEMORY_ID" ]; then
+  echo "错误: 缺少记忆ID"
+  echo "用法: memory-forget <memory-id> [--older <days>]"
+  exit 1
+fi
+
+# 检查记忆是否存在
+EXISTS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM memories WHERE id = '$MEMORY_ID';")
+
+if [ "$EXISTS" -eq 0 ]; then
+  echo "错误: 找不到记忆 $MEMORY_ID"
+  exit 1
+fi
+
+if [ "$CONFIRM" = true ]; then
+  CONTENT=$(sqlite3 "$DB_PATH" "SELECT content FROM memories WHERE id = '$MEMORY_ID';")
+  echo "将删除: $CONTENT"
+  read -p "确认删除? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "已取消"
+    exit 0
+  fi
+fi
+
+# 软删除
+sqlite3 "$DB_PATH" <<EOF
+INSERT INTO deleted_memories (id, memory_id, content, deleted_at)
+SELECT 
+  'del_' || id,
+  id,
+  content,
+  datetime('now')
+FROM memories
+WHERE id = '$MEMORY_ID';
+
+DELETE FROM memories
+WHERE id = '$MEMORY_ID';
+EOF
+
+echo "✓ 已删除记忆 $MEMORY_ID"

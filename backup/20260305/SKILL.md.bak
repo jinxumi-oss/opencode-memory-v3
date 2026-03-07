@@ -1,0 +1,53 @@
+---
+name: timeline-memory
+description: 6层时序记忆系统 - 存储和检索重要信息
+triggers: "记忆", "存储", "回忆", "检索", "记住", "忘记"
+---
+
+# 时序记忆系统
+
+## 核心原则
+
+1. 线性底座不可篡改（只追加）
+2. 逻辑与物理分离
+3. 时序确定性
+
+## 存储架构
+
+```
+~/.opencode/memory/
+├── timeline/           # L0 线性存储
+├── memory.db           # SQLite 数据库
+└── *.md                # 记忆文档
+```
+
+## 可用工具
+
+| 工具 | 功能 |
+|------|------|
+| memory_store | 存储新记忆 |
+| memory_recall | 检索记忆 |
+| memory_forget | 遗忘记忆（移至隔离层） |
+
+## 分层管理
+
+| 层级 | 权重 | 说明 |
+|------|------|------|
+| hot | 0.8-1.0 | 7日内调用≥3次 |
+| warm | 0.3-0.8 | 常规记忆 |
+| cold | 0.05-0.3 | 60日无调用 |
+| isolated | 0-0.05 | 淘汰记忆 |
+
+## 使用场景
+
+- 存储重要决策和偏好
+- 检索历史信息
+- 管理记忆生命周期
+
+## CLI 工具
+
+```bash
+~/.opencode/bin/memory.sh stats    # 统计
+~/.opencode/bin/memory.sh list     # 列出
+~/.opencode/bin/memory.sh recall <query>  # 搜索
+```

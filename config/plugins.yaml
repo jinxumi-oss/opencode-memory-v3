@@ -1,0 +1,99 @@
+# OpenCode 插件配置 v2.0
+# 实际生效配置
+
+# ============= 记忆插件 =============
+memory:
+  provider: local
+  path: ~/.opencode/memory
+  maxEntries: 1000
+  ttlSeconds: 3600
+  compression_threshold: 500
+  compression_ratio: 0.7
+  categories:
+    identity: 用户画像
+    preferences: 偏好设置
+    skills: 技能记录
+    decisions: 重要决策
+    context: 上下文信息
+    code: 代码片段
+
+# ============= 向量存储 =============
+vector:
+  provider: local
+  methods:
+    - keyword
+    - semantic
+    - hybrid
+  default_top_k: 10
+  search_threshold: 0.3
+  cache_size: 1000
+  cache_ttl: 300
+
+# ============= 检索配置 =============
+retrieval:
+  default_top_k: 10
+  categories:
+    - identity
+    - knowledge
+    - skill
+    - code
+    - decisions
+  ranking:
+    recency_weight: 0.3
+    relevance_weight: 0.4
+    importance_weight: 0.3
+  mixed_threshold: 0.5
+
+# ============= 索引配置 =============
+index:
+  auto_update: true
+  update_interval: hourly
+  output: ~/.opencode/memory/INDEX.md
+  distill_interval: daily
+  max_session_length: 100000
+
+# ============= Skills 插件 =============
+skills:
+  - name: git-master
+    enabled: true
+    priority: 1
+  - name: ralph-loop
+    enabled: true
+    priority: 1
+  - name: playwright
+    enabled: false
+    priority: 2
+  - name: dev-browser
+    enabled: false
+    priority: 2
+  - name: frontend-ui-ux
+    enabled: false
+    priority: 3
+  - name: web-perf
+    enabled: false
+    priority: 3
+  - name: shadcn-ui
+    enabled: false
+    priority: 3
+  - name: end-to-end-loop
+    enabled: false
+    priority: 1
+
+# ============= 会话恢复 =============
+session:
+  autoRestore: true
+  maxActive: 5
+  archive_after_days: 3
+  keepInactive: 30
+  autoSave: true
+
+# ============= 备份策略 =============
+backup:
+  enabled: true
+  keepDays: 7
+  path: ~/.opencode/backup
+  schedule:
+    full: weekly
+    incremental: daily
+  compression: true
+  encryption: false

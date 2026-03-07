@@ -1,0 +1,53 @@
+# 依赖
+node_modules
+bun.lock
+
+# 配置（包含敏感信息）
+.env
+.env.local
+*.env
+!*.env.example
+
+# 日志
+logs/*.log
+*.log
+backup/memory_*.tar.gz
+backup/incremental/*.tar.gz
+
+# 缓存
+cache/*
+
+# 会话
+sessions/active/*.json
+sessions/archived/*.json
+
+# 系统文件
+config.yaml
+SEED.md
+
+# 记忆（包含个人数据）
+memory/MEMORY.md
+memory/SEED.md
+memory/INDEX.md
+
+# 自动生成的文件
+reports/*.md
+
+# 数据库文件
+*.db
+*.db.backup-*
+*.db-journal
+*.db-wal
+
+# 临时文件
+/tmp/opencode_session_id
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

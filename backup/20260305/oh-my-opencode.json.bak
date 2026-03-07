@@ -1,0 +1,163 @@
+{
+  "agents": {
+    "hephaestus": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 8192
+      }
+    },
+    "oracle": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 8192
+      }
+    },
+    "librarian": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    },
+    "explore": {
+      "model": "glm-5",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    },
+    "multimodal-looker": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    },
+    "prometheus": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.5,
+        "maxTokens": 8192
+      }
+    },
+    "metis": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.4,
+        "maxTokens": 8192
+      }
+    },
+    "momus": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      }
+    },
+    "atlas": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    }
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.5,
+        "maxTokens": 8192
+      }
+    },
+    "ultrabrain": {
+      "model": "qwen3-max-2026-01-23",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 16384
+      }
+    },
+    "deep": {
+      "model": "glm-5",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 8192
+      }
+    },
+    "artistry": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.7,
+        "maxTokens": 8192
+      }
+    },
+    "quick": {
+      "model": "glm-4.7",
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 2048
+      }
+    },
+    "unspecified-low": {
+      "model": "glm-4.7",
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 2048
+      }
+    },
+    "unspecified-high": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 8192
+      }
+    },
+    "writing": {
+      "model": "qwen3.5-plus",
+      "options": {
+        "temperature": 0.5,
+        "maxTokens": 8192
+      }
+    }
+  },
+  "hooks": {
+    "auto-diagnostic": {
+      "enabled": true,
+      "triggers": ["file_edit", "file_write"],
+      "action": "lsp_diagnostics"
+    },
+    "todo-continuation": {
+      "enabled": true,
+      "triggers": ["session_start", "task_assigned"],
+      "action": "load_pending_todos"
+    },
+    "verify-before-complete": {
+      "enabled": true,
+      "triggers": ["task_complete"],
+      "action": "run_validation"
+    },
+    "auto-commit-check": {
+      "enabled": true,
+      "triggers": ["pre_commit"],
+      "action": "verify_tests_pass"
+    }
+  },
+  "skills": {
+    "priority": ["user", "project", "builtin"],
+    "autoLoad": ["ralph-loop", "git-master", "persistent-context"]
+  },
+  "experimental": {
+    "autoVerify": true,
+    "tightFeedbackLoops": true,
+    "parallelAgents": true,
+    "sessionPersistence": true,
+    "contextPreservation": true,
+    "deepScan": true,
+    "scanOnStartup": true,
+    "scanPatterns": ["**/*.rs", "**/Cargo.toml", "**/*.md", "**/*.json"],
+    "gitHistoryDepth": 10,
+    "cacheProjectContext": true
+  }
+}

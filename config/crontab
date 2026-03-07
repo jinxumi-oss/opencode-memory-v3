@@ -1,0 +1,91 @@
+# OpenCode 定时任务配置 v2.0
+
+## Cron 任务
+
+### 自动备份 (每天 3:00)
+```bash
+0 3 * * * ~/.opencode/bin/memory.sh backup >> ~/.opencode/logs/backup.log 2>&1
+```
+
+### 自动清理 (每周日 4:00)
+```bash
+0 4 * * 0 ~/.opencode/bin/memory.sh clean >> ~/.opencode/logs/clean.log 2>&1
+```
+
+### 智能提炼 (每天 22:00)
+```bash
+0 22 * * * ~/.opencode/bin/distill.sh auto >> ~/.opencode/logs/distill.log 2>&1
+```
+
+### 索引更新 (每小时)
+```bash
+0 * * * * ~/.opencode/bin/indexer.sh update >> ~/.opencode/logs/indexer.log 2>&1
+```
+
+---
+
+## 安装 Cron 任务
+
+```bash
+# 创建日志目录
+mkdir -p ~/.opencode/logs
+
+# 添加到 crontab
+(crontab -l 2>/dev/null; cat <<'EOF'
+# OpenCode 记忆系统自动任务 v2.0
+0 3 * * * ~/.opencode/bin/memory.sh backup >> ~/.opencode/logs/backup.log 2>&1
+0 4 * * 0 ~/.opencode/bin/memory.sh clean >> ~/.opencode/logs/clean.log 2>&1
+0 22 * * * ~/.opencode/bin/distill.sh auto >> ~/.opencode/logs/distill.log 2>&1
+0 * * * * ~/.opencode/bin/indexer.sh update >> ~/.opencode/logs/indexer.log 2>&1
+EOF
+) | crontab -
+
+# 查看任务
+crontab -l
+```
+
+---
+
+## 任务说明
+
+| 任务 | 脚本 | 时间 | 行为 |
+|------|------|------|------|
+| backup | memory.sh | 每天 3:00 | 全量/增量备份 |
+| clean | memory.sh | 每周日 4:00 | 清理旧会话和备份 |
+| distill | distill.sh | 每天 22:00 | 智能提炼并写入 MEMORY.md |
+| index | indexer.sh | 每小时 | 更新索引 |
+
+---
+
+## 手动控制
+
+```bash
+# 暂停所有自动任务
+crontab -r
+
+# 恢复任务
+~/.opencode/bin/memory.sh install-cron
+
+# 查看日志
+tail -f ~/.opencode/logs/backup.log
+tail -f ~/.opencode/logs/distill.log
+tail -f ~/.opencode/logs/indexer.log
+```
+
+---
+
+## 快速命令
+
+```bash
+# 手动备份
+~/.opencode/bin/memory.sh backup
+
+# 手动提炼
+~/.opencode/bin/distill.sh full
+
+# 手动更新索引
+~/.opencode/bin/indexer.sh update
+
+# 查看统计
+~/.opencode/bin/indexer.sh stats
+```

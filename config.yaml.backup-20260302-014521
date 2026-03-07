@@ -1,0 +1,189 @@
+# OpenCode 主配置文件 v2.0
+# 大模型配置
+
+# ============= 大模型提供商配置 =============
+llm:
+  provider: openai  # openai | anthropic | local | ollama
+  model: qwen-plus  # 选择模型
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 60
+  retry:
+    max_attempts: 3
+    backoff: 2
+  cost_tracking: true
+  budget_per_day: 5.0
+
+# ============= OpenAI 配置 =============
+openai:
+  api_key: ${OPENAI_API_KEY}
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  organization: ""
+
+# ============= Anthropic Claude 配置 =============
+anthropic:
+  api_key: ${ANTHROPIC_API_KEY}
+  model: claude-3-5-sonnet-20241022
+  max_tokens: 8192
+  temperature: 0.7
+
+# ============= 本地模型配置 =============
+local:
+  model: "llama3:8b"
+  gpu_enabled: true
+  context_size: 8192
+  temperature: 0.7
+  api_url: "http://localhost:11434/v1"
+
+# ============= 记忆系统配置 =============
+memory:
+  provider: local
+  path: ~/.opencode/memory
+  maxEntries: 1000
+  ttlSeconds: 3600
+  compression_threshold: 500
+  compression_ratio: 0.7
+  categories:
+    identity: 用户画像
+    preferences: 偏好设置
+    skills: 技能记录
+    decisions: 重要决策
+    context: 上下文信息
+    code: 代码片段
+
+# ============= 向量检索配置 =============
+vector:
+  provider: local
+  methods:
+    - keyword
+    - semantic
+    - hybrid
+  default_top_k: 10
+  search_threshold: 0.3
+  cache_size: 1000
+  cache_ttl: 300
+
+# ============= 检索策略 =============
+retrieval:
+  default_top_k: 10
+  categories:
+    - identity
+    - knowledge
+    - skill
+    - code
+    - decisions
+  ranking:
+    recency_weight: 0.3
+    relevance_weight: 0.4
+    importance_weight: 0.3
+  mixed_threshold: 0.5
+
+# ============= 索引配置 =============
+index:
+  auto_update: true
+  update_interval: hourly
+  output: ~/.opencode/memory/INDEX.md
+  distill_interval: daily
+  max_session_length: 100000
+
+# ============= Skills 插件配置 =============
+skills:
+  - name: git-master
+    enabled: true
+    priority: 1
+  - name: ralph-loop
+    enabled: true
+    priority: 1
+  - name: playwright
+    enabled: false
+    priority: 2
+  - name: dev-browser
+    enabled: false
+    priority: 2
+  - name: frontend-ui-ux
+    enabled: false
+    priority: 3
+  - name: web-perf
+    enabled: false
+    priority: 3
+  - name: shadcn-ui
+    enabled: false
+    priority: 3
+  - name: end-to-end-loop
+    enabled: false
+    priority: 1
+
+# ============= 会话管理 =============
+session:
+  autoRestore: true
+  maxActive: 5
+  archive_after_days: 3
+  keepInactive: 30
+  autoSave: true
+
+# ============= 备份策略 =============
+backup:
+  enabled: true
+  keepDays: 7
+  path: ~/.opencode/backup
+  schedule:
+    full: weekly
+    incremental: daily
+  compression: true
+  encryption: false
+
+# ============= 性能优化 =============
+performance:
+  max_concurrent_tasks: 5
+  max_concurrent_agents: 3
+  cache:
+    enabled: true
+    ttl_seconds: 3600
+    size_limit_mb: 500
+  logging:
+    level: INFO
+    file: ~/.opencode/logs/app.log
+    rotation: daily
+    max_backups: 7
+
+# ============= 调试配置 =============
+debug:
+  enabled: false
+  verbose: false
+  slow_mode: false
+  timeout_multiplier: 1.0
+
+# ============= 网络配置 =============
+network:
+  proxy: ""
+  timeout: 60
+  retry_on_timeout: true
+
+# ============= 安全配置 =============
+security:
+  mask_api_keys: true
+  mask_passwords: true
+  trusted_directories:
+    - /home/jin
+    - ~/projects
+    - ~/.opencode
+  restricted_directories:
+    - /etc
+    - /root
+    - /sys
+    - /proc
+    - ~/.ssh
+    - ~/.gnupg
+  require_confirmation: true
+  danger_level: 2
+
+# ============= 使用说明 =============
+
+# 环境变量设置：
+# export OPENAI_API_KEY="sk-..."
+# export ANTHROPIC_API_KEY="sk-ant-..."
+
+# 模型选择建议：
+# - 成本优先: gpt-4o-mini
+# - 平衡: gpt-4o 或 claude-3.5-sonnet
+# - 本地: llama3:8b
