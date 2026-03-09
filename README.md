@@ -8,7 +8,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/opencode-memory-system.git
+git clone https://github.com/jinxumi-oss/opencode-memory-v3.git
 cd opencode-memory-system
 
 # 运行安装脚本
