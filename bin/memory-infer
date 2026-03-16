@@ -1,0 +1,2 @@
+#!/bin/bash
+npx tsx /home/jin/.opencode/src/cli/index.ts infer "$@"

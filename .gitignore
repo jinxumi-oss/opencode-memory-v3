@@ -1,6 +1,7 @@
 # 依赖
 node_modules
 bun.lock
+package-lock.json
 
 # 配置（包含敏感信息）
 .env
@@ -29,6 +30,7 @@ SEED.md
 memory/MEMORY.md
 memory/SEED.md
 memory/INDEX.md
+memory/timeline/*.md
 
 # 自动生成的文件
 reports/*.md
@@ -38,6 +40,12 @@ reports/*.md
 *.db.backup-*
 *.db-journal
 *.db-wal
+
+# 构建输出
+dist/
+
+# 备份目录
+bin_old/
 
 # 临时文件
 /tmp/opencode_session_id
