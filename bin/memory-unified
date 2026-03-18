@@ -1,0 +1,102 @@
+#!/usr/bin/env bun
+
+import { store, recall, forget, stats, rebuildFromTimeline } from '../src/memory/store.ts';
+import { search } from '../src/memory/search.ts';
+import { migrateTiers, getTierStats } from '../src/memory/tiers.ts';
+import { extractEntities } from '../src/memory/ner.ts';
+
+const args = process.argv.slice(2);
+const command = args[0];
+
+function parseArgs(args: string[], flag: string): string | undefined {
+  const idx = args.indexOf(flag);
+  return idx !== -1 && idx + 1 < args.length ? args[idx + 1] : undefined;
+}
+
+async function main() {
+  switch (command) {
+    case 'store': {
+      const content = args[1];
+      if (!content) {
+        console.log('Usage: memory store <content> [-t type] [--tags tag1,tag2]');
+        process.exit(1);
+      }
+      const type = parseArgs(args, '-t') || 'note';
+      const tags = parseArgs(args, '--tags')?.split(',') || [];
+      const result = await store(content, { type, tags });
+      console.log(JSON.stringify(result, null, 2));
+      break;
+    }
+    
+    case 'recall': {
+      const query = args[1];
+      if (!query) {
+        console.log('Usage: memory recall <query> [-l limit] [-m method]');
+        process.exit(1);
+      }
+      const limit = parseInt(parseArgs(args, '-l') || '10');
+      const method = (parseArgs(args, '-m') || 'hybrid') as any;
+      const results = await search({ query, limit, method });
+      console.log(JSON.stringify(results, null, 2));
+      break;
+    }
+    
+    case 'stats': {
+      const result = { ...stats(), tiers: getTierStats() };
+      console.log(JSON.stringify(result, null, 2));
+      break;
+    }
+    
+    case 'forget': {
+      const id = args[1];
+      if (!id) {
+        console.log('Usage: memory forget <id>');
+        process.exit(1);
+      }
+      const result = forget(id);
+      console.log(JSON.stringify({ success: result }, null, 2));
+      break;
+    }
+    
+    case 'migrate-tiers': {
+      const result = migrateTiers();
+      console.log(JSON.stringify(result, null, 2));
+      break;
+    }
+    
+    case 'extract': {
+      const text = args.slice(1).join(' ');
+      if (!text) {
+        console.log('Usage: memory extract <text>');
+        process.exit(1);
+      }
+      const entities = extractEntities(text);
+      console.log(JSON.stringify(entities, null, 2));
+      break;
+    }
+    
+    case 'rebuild': {
+      const count = rebuildFromTimeline();
+      console.log(JSON.stringify({ rebuilt: count }, null, 2));
+      break;
+    }
+    
+    default:
+      console.log(`
+Memory System v4.2 - Unified CLI
+
+Usage: memory <command> [options]
+
+Commands:
+  store <content>    Store a new memory
+  recall <query>     Search memories
+  stats              Show statistics
+  forget <id>        Mark memory as forgotten
+  migrate-tiers      Run tier migration
+  extract <text>     Extract entities
+  rebuild            Rebuild from timeline
+`);
+  }
+}
+
+main().catch(console.error);

@@ -1,0 +1,177 @@
+#!/usr/bin/env bun
+
+import { Database } from 'bun:sqlite';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const HOME = process.env.HOME || '/home/jin';
+const OLD_DB = path.join(HOME, '.opencode/memory/memory.db');
+const NEW_DB = path.join(HOME, '.opencode/memory/unified.db');
+const TIMELINE_DIR = path.join(HOME, '.opencode/memory/timeline');
+
+function log(msg: string) {
+  console.log(`[${new Date().toISOString()}] ${msg}`);
+}
+
+async function migrateFromOldDb(): Promise<number> {
+  if (!fs.existsSync(OLD_DB)) {
+    log('Old database not found, skipping migration');
+    return 0;
+  }
+  
+  const oldDb = new Database(OLD_DB, { readonly: true });
+  const newDb = new Database(NEW_DB);
+  
+  let count = 0;
+  
+  const memories = oldDb.prepare('SELECT * FROM memories').all() as any[];
+  
+  for (const mem of memories) {
+    const existing = newDb.prepare('SELECT id FROM memories WHERE content_hash = ?').get(mem.content_hash);
+    if (existing) continue;
+    
+    newDb.prepare(`
+      INSERT INTO memories (id, content_hash, summary, content, memory_type, source, tier, weight, access_count, tags, created_at, last_accessed)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      mem.id,
+      mem.content_hash || mem.content_hash?.slice(0, 16),
+      mem.summary || mem.content?.slice(0, 100),
+      mem.content,
+      mem.type || 'note',
+      mem.source || 'migration',
+      'warm',
+      mem.weight || 0.5,
+      mem.access_count || 0,
+      mem.tags,
+      mem.created_at,
+      mem.last_accessed
+    );
+    
+    count++;
+  }
+  
+  oldDb.close();
+  newDb.close();
+  
+  return count;
+}
+
+async function migrateFromTimeline(): Promise<number> {
+  if (!fs.existsSync(TIMELINE_DIR)) {
+    log('Timeline directory not found');
+    return 0;
+  }
+  
+  const files = fs.readdirSync(TIMELINE_DIR).filter(f => f.endsWith('.md')).sort();
+  const newDb = new Database(NEW_DB);
+  
+  let count = 0;
+  
+  for (const file of files) {
+    const content = fs.readFileSync(path.join(TIMELINE_DIR, file), 'utf-8');
+    const entries = parseTimeline(content);
+    
+    for (const entry of entries) {
+      const existing = newDb.prepare('SELECT id FROM timeline_entries WHERE id = ?').get(entry.id);
+      if (existing) continue;
+      
+      newDb.prepare(`
+        INSERT INTO timeline_entries (id, timestamp, content, content_hash, entry_type, source, importance, is_immutable, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(
+        entry.id,
+        entry.timestamp,
+        entry.content,
+        entry.content_hash,
+        entry.type || 'note',
+        entry.source || 'user',
+        entry.importance || 0.5,
+        entry.timestamp
+      );
+      
+      count++;
+    }
+  }
+  
+  newDb.close();
+  return count;
+}
+
+function parseTimeline(content: string): any[] {
+  const entries: any[] = [];
+  const parts = content.split('---\n').filter(p => p.trim());
+  
+  for (let i = 0; i < parts.length; i += 2) {
+    if (i + 1 >= parts.length) break;
+    
+    const frontmatter = parts[i];
+    const body = parts[i + 1];
+    
+    if (!frontmatter || !body) continue;
+    
+    const meta: Record<string, string> = {};
+    frontmatter.split('\n').forEach(line => {
+      const [key, ...values] = line.split(': ');
+      if (key && values.length) meta[key.trim()] = values.join(': ').trim();
+    });
+    
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(body.trim()).digest('hex');
+    
+    entries.push({
+      id: meta.id || `tl_${Date.now()}`,
+      timestamp: meta.timestamp || new Date().toISOString(),
+      content: body.trim(),
+      content_hash: hash,
+      type: meta.type || 'note',
+      source: meta.source || 'user',
+      importance: meta.importance ? parseFloat(meta.importance) : 0.5
+    });
+  }
+  
+  return entries;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const cmd = args[0];
+  
+  switch (cmd) {
+    case 'from-old-db': {
+      log('Migrating from old database...');
+      const count = await migrateFromOldDb();
+      log(`Migrated ${count} records`);
+      break;
+    }
+    
+    case 'from-timeline': {
+      log('Migrating from timeline...');
+      const count = await migrateFromTimeline();
+      log(`Migrated ${count} timeline entries`);
+      break;
+    }
+    
+    case 'all': {
+      log('Running full migration...');
+      const dbCount = await migrateFromOldDb();
+      const tlCount = await migrateFromTimeline();
+      log(`Migration complete: ${dbCount} from DB, ${tlCount} from timeline`);
+      break;
+    }
+    
+    default:
+      console.log(`
+Migration Script
+
+Usage: migrate <command>
+
+Commands:
+  from-old-db    Migrate from old memory.db
+  from-timeline  Migrate from timeline files
+  all            Run all migrations
+`);
+  }
+}
+
+main().catch(console.error);

@@ -1,0 +1,140 @@
+#!/usr/bin/env bun
+
+import { Database } from 'bun:sqlite';
+import { EmbeddingService } from '../src/memory/embeddings.js';
+
+const DB_PATH = process.env.HOME + '/.opencode/memory/unified.db';
+const OLLAMA_API = 'http://localhost:11434';
+
+function hashContent(content: string): string {
+  const crypto = require('crypto');
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+async function getCachedEmbedding(db: Database, contentHash: string): Promise<number[] | null> {
+  const row = db.prepare('SELECT embedding FROM embedding_cache WHERE content_hash = ?').get(contentHash) as any;
+  if (row?.embedding) {
+    return Array.from(new Float32Array(row.embedding));
+  }
+  return null;
+}
+
+async function cacheEmbedding(db: Database, contentHash: string, embedding: number[]): void {
+  const buffer = Buffer.from(new Float32Array(embedding).buffer);
+  db.run(`
+    INSERT OR REPLACE INTO embedding_cache (content_hash, embedding, embedding_model, created_at)
+    VALUES (?, ?, 'nomic-embed-text', datetime('now'))
+  `, [contentHash, buffer]);
+}
+
+async function generateEmbeddingWithCache(db: Database, content: string): Promise<{ embedding: number[]; model: string } | null> {
+  const contentHash = hashContent(content);
+  
+  const cached = await getCachedEmbedding(db, contentHash);
+  if (cached) {
+    return { embedding: cached, model: 'nomic-embed-text' };
+  }
+  
+  try {
+    const response = await fetch(`${OLLAMA_API}/api/embeddings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'nomic-embed-text', prompt: content })
+    });
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json() as { embedding: number[] };
+    
+    await cacheEmbedding(db, contentHash, data.embedding);
+    
+    return { embedding: data.embedding, model: 'nomic-embed-text' };
+  } catch {
+    return null;
+  }
+}
+
+async function checkOllama(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(`${OLLAMA_API}/api/version`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function backfillEmbeddings(): Promise<{ total: number; success: number; failed: number; cached: number }> {
+  const db = new Database(DB_PATH);
+  
+  const memories = db.prepare(`
+    SELECT m.id, m.content 
+    FROM memories m 
+    LEFT JOIN block_embeddings be ON m.id = be.block_id 
+    WHERE be.block_id IS NULL AND m.tier != 'isolated'
+  `).all() as any[];
+  
+  console.log(`Found ${memories.length} memories without embeddings`);
+  
+  let success = 0;
+  let failed = 0;
+  let cached = 0;
+  
+  for (const mem of memories) {
+    try {
+      const result = await generateEmbeddingWithCache(db, mem.content);
+      
+      if (result && result.embedding && result.embedding.length > 0) {
+        const embeddingBuffer = Buffer.from(new Float32Array(result.embedding).buffer);
+        
+        db.run(`
+          INSERT OR REPLACE INTO block_embeddings (block_id, embedding, embedding_model, embedding_dim, created_at)
+          VALUES (?, ?, ?, 768, datetime('now'))
+        `, [mem.id, embeddingBuffer, result.model]);
+        
+        success++;
+        console.log(`✅ [${success}/${memories.length}] ${mem.id}`);
+      } else {
+        failed++;
+        console.log(`⚠️ [${failed}] No embedding: ${mem.id}`);
+      }
+    } catch (err) {
+      failed++;
+      console.log(`❌ [${failed}] Error ${mem.id}: ${(err as Error).message}`);
+    }
+  }
+  
+  const cachedCount = db.prepare('SELECT COUNT(*) as count FROM embedding_cache').get() as { count: number };
+  cached = cachedCount.count;
+  
+  db.close();
+  
+  return { total: memories.length, success, failed, cached };
+}
+
+async function main() {
+  console.log('=== Embedding Backfill Script v2 ===\n');
+  
+  const ollamaReady = await checkOllama();
+  if (!ollamaReady) {
+    console.log('⚠️ Ollama not available at http://localhost:11434');
+    console.log('To enable: ollama serve && ollama pull nomic-embed-text\n');
+    process.exit(1);
+  }
+  
+  console.log('✅ Ollama is available\n');
+  
+  const result = await backfillEmbeddings();
+  
+  console.log('\n=== Summary ===');
+  console.log(`Total memories: ${result.total}`);
+  console.log(`Successfully embedded: ${result.success}`);
+  console.log(`Failed: ${result.failed}`);
+  console.log(`Cache entries: ${result.cached}`);
+  console.log(`Coverage: ${result.total > 0 ? ((result.success / result.total) * 100).toFixed(1) : 0}%`);
+}
+
+main().catch(console.error);

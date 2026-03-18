@@ -1,2 +1,2 @@
 #!/bin/bash
-npx tsx /home/jin/.opencode/src/cli/index.ts recall "$@"
+exec ~/.opencode/bin/memory-unified "$(basename $0 | sed 's/memory-//')" "$@"
