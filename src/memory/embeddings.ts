@@ -3,7 +3,7 @@
  * Provides embedding generation, storage, and semantic search with fallback to keyword search
  */
 
-const DB_PATH = process.env.HOME + '/.opencode/memory/memory.db';
+const DB_PATH = process.env.HOME + '/.opencode/memory/memory_v4.db';
 const OLLAMA_API = 'http://localhost:11434';
 
 export interface MemoryBlock {
@@ -122,7 +122,7 @@ export class EmbeddingService {
 
       if (!row?.embedding) return null;
 
-      return Array.from(new Float32Array(row.embedding));
+      return Array.from(new Float32Array(row.embedding.buffer || row.embedding));
     } finally {
       db.close();
     }
@@ -174,7 +174,7 @@ export class EmbeddingService {
         for (const row of rows) {
           if (!row.embedding) continue;
 
-          const blockEmbedding = Array.from(new Float32Array(row.embedding));
+          const blockEmbedding = Array.from(new Float32Array(row.embedding.buffer || row.embedding));
           const similarity = this.cosineSimilarity(queryEmbedding, blockEmbedding);
 
           results.push({
@@ -296,7 +296,7 @@ export async function checkSemanticDuplicate(
   dbPath?: string
 ): Promise<{ blockId: string; similarity: number } | null> {
   const { Database } = await import('bun:sqlite');
-  const actualDbPath = dbPath || process.env.HOME + '/.opencode/memory/unified.db';
+  const actualDbPath = dbPath || process.env.HOME + '/.opencode/memory/memory_v4.db';
 
   try {
     // Check if Ollama is available for embedding generation
@@ -323,7 +323,7 @@ export async function checkSemanticDuplicate(
       let mostSimilar: { blockId: string; similarity: number } | null = null;
 
       for (const row of rows) {
-        const blockEmbedding = Array.from(new Float32Array(row.embedding));
+        const blockEmbedding = Array.from(new Float32Array(row.embedding.buffer || row.embedding));
         const similarity = embeddingService.cosineSimilarity(embedding, blockEmbedding);
 
         if (similarity > threshold) {

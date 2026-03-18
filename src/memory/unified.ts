@@ -16,7 +16,7 @@ import Database from 'better-sqlite3';
 
 const HOME_DIR = process.env.HOME || '/home/jin';
 const TIMELINE_DIR = path.join(HOME_DIR, '.opencode/memory/timeline');
-const DB_PATH = path.join(HOME_DIR, '.opencode/memory/unified.db');
+const DB_PATH = path.join(HOME_DIR, '.opencode/memory/memory_v4.db');
 
 interface TimelineEntry {
   id: string;

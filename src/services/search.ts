@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { Memory, RecallResult, SearchOptions } from '../types/index.js';
 import { EmbeddingService } from './embedding.js';
+import { randomUUID } from 'crypto';
 
 export class SearchService {
   private db: Database.Database;
@@ -11,19 +12,43 @@ export class SearchService {
     this.embeddingService = embeddingService;
   }
 
+  private recordRecallHistory(query: string, method: string, results: RecallResult[], sessionId?: string): void {
+    try {
+      const id = `rh_${Date.now()}_${randomUUID().slice(0, 8)}`;
+      const recalledIds = results.map(r => r.memory.id).join(',');
+      const avgScore = results.length > 0 
+        ? results.reduce((sum, r) => sum + r.score, 0) / results.length 
+        : 0;
+      
+      this.db.prepare(`
+        INSERT INTO recall_history (id, session_id, query, recalled_ids, recall_method, score, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(id, sessionId || null, query, recalledIds, method, avgScore);
+    } catch {
+      // Ignore errors in history recording
+    }
+  }
+
   search(options: SearchOptions): RecallResult[] {
+    let results: RecallResult[];
     switch (options.method) {
       case 'bm25':
-        return this.bm25Search(options);
+        results = this.bm25Search(options);
+        break;
       case 'semantic':
-        return this.semanticSearch(options);
+        results = this.semanticSearch(options);
+        break;
       case 'hybrid':
-        return this.hybridSearch(options);
+        results = this.hybridSearch(options);
+        break;
       case 'contextual':
-        return this.contextualSearch(options);
+        results = this.contextualSearch(options);
+        break;
       default:
-        return this.hybridSearch(options);
+        results = this.hybridSearch(options);
     }
+    this.recordRecallHistory(options.query, options.method || 'hybrid', results);
+    return results;
   }
 
   bm25Search(options: SearchOptions): RecallResult[] {
@@ -196,7 +221,9 @@ export class SearchService {
     const results = Array.from(resultsMap.values());
     results.sort((a, b) => b.score - a.score);
     
-    return results.slice(0, options.limit);
+    const finalResults = results.slice(0, options.limit);
+    this.recordRecallHistory(options.query, 'hybrid', finalResults);
+    return finalResults;
   }
 
   contextualSearch(options: SearchOptions): RecallResult[] {

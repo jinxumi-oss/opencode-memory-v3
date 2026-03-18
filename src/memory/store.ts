@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { checkSemanticDuplicate } from './embeddings';
 
-const DB_PATH = process.env.HOME + '/.opencode/memory/unified.db';
+const DB_PATH = process.env.HOME + '/.opencode/memory/memory_v4.db';
 const TIMELINE_DIR = process.env.HOME + '/.opencode/memory/timeline';
 
 export interface TimelineEntry {
@@ -174,7 +174,7 @@ export async function store(content: string, options: {
   const memoryId = generateId('mem');
   
   db.prepare(`
-    INSERT INTO memories (id, content_hash, content, memory_type, source, tier, weight, timeline_entry_ids, tags, created_at)
+    INSERT INTO memories (id, content_hash, content, type, source, tier, weight, timeline_entry_ids, tags, created_at)
     VALUES (?, ?, ?, ?, ?, 'warm', ?, ?, ?, ?)
   `).run(
     memoryId,
@@ -226,7 +226,7 @@ export function recall(query: string, options: {
     params.push(options.tier);
   }
   if (options.type) {
-    sql += ' AND m.memory_type = ?';
+    sql += ' AND m.type = ?';
     params.push(options.type);
   }
   
@@ -248,7 +248,7 @@ export function recall(query: string, options: {
     content_hash: row.content_hash,
     summary: row.summary,
     content: row.content,
-    memory_type: row.memory_type,
+    memory_type: row.type,
     source: row.source,
     tier: row.tier,
     weight: row.weight,
@@ -287,9 +287,9 @@ export function stats(): { total: number; byType: Record<string, number>; byTier
   const total = (db.prepare('SELECT COUNT(*) as count FROM memories WHERE tier != ?').get('isolated') as any)?.count || 0;
   
   const byType: Record<string, number> = {};
-  const typeRows = db.prepare('SELECT memory_type, COUNT(*) as count FROM memories WHERE tier != ? GROUP BY memory_type')
+  const typeRows = db.prepare('SELECT type, COUNT(*) as count FROM memories WHERE tier != ? GROUP BY type')
     .all('isolated') as any[];
-  for (const row of typeRows) byType[row.memory_type] = row.count;
+  for (const row of typeRows) byType[row.type] = row.count;
   
   const byTier: Record<string, number> = {};
   const tierRows = db.prepare('SELECT tier, COUNT(*) as count FROM memories GROUP BY tier').all() as any[];

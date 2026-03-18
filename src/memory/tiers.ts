@@ -5,7 +5,7 @@
 
 import { Database } from 'bun:sqlite';
 
-const DB_PATH = process.env.HOME + '/.opencode/memory/unified.db';
+const DB_PATH = process.env.HOME + '/.opencode/memory/memory_v4.db';
 
 export type Tier = 'hot' | 'warm' | 'cold' | 'isolated';
 

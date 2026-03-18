@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { EmbeddingService } from './embeddings.js';
 
-const DB_PATH = process.env.HOME + '/.opencode/memory/unified.db';
+const DB_PATH = process.env.HOME + '/.opencode/memory/memory_v4.db';
 const RRF_K = 60;
 
 export interface SearchOptions {
@@ -36,7 +36,7 @@ function rowToMemory(row: any): any {
     content_hash: row.content_hash,
     summary: row.summary,
     content: row.content,
-    memory_type: row.memory_type,
+    memory_type: row.type,
     source: row.source,
     tier: row.tier,
     weight: row.weight,
@@ -68,7 +68,7 @@ export function bm25Search(options: SearchOptions): SearchResult[] {
     params.push(tier);
   }
   if (type) {
-    sql += ' AND m.memory_type = ?';
+    sql += ' AND m.type = ?';
     params.push(type);
   }
   
@@ -91,17 +91,17 @@ export async function semanticSearch(options: SearchOptions): Promise<SearchResu
   const db = getDb();
   const { query, limit = 10, tier, type } = options;
   
-  const queryEmbedding = await (embeddingService as any).embed(query);
-  if (!queryEmbedding || queryEmbedding.length === 0) {
-    db.close();
-    return bm25Search(options);
-  }
+  try {
+    const queryEmbedding = await embeddingService.generateEmbedding(query);
+    if (!queryEmbedding || queryEmbedding.length === 0) {
+      db.close();
+      return bm25Search(options);
+    }
   
   let sql = `
-    SELECT m.*, be.embedding 
+    SELECT m.*, m.embedding 
     FROM memories m
-    LEFT JOIN block_embeddings be ON m.id = be.block_id
-    WHERE m.tier != 'isolated'
+    WHERE m.tier != 'isolated' AND m.embedding IS NOT NULL
   `;
   const params: (string | number)[] = [];
   
@@ -110,7 +110,7 @@ export async function semanticSearch(options: SearchOptions): Promise<SearchResu
     params.push(tier);
   }
   if (type) {
-    sql += ' AND m.memory_type = ?';
+    sql += ' AND m.type = ?';
     params.push(type);
   }
   
@@ -120,8 +120,8 @@ export async function semanticSearch(options: SearchOptions): Promise<SearchResu
   for (const row of rows) {
     if (!row.embedding) continue;
     
-    const storedEmbedding = Array.from(new Float32Array(row.embedding));
-    const similarity = embeddingService.cosineSimilarity(queryEmbedding.embedding, storedEmbedding);
+    const storedEmbedding = Array.from(new Float32Array(row.embedding.buffer || row.embedding));
+    const similarity = embeddingService.cosineSimilarity(queryEmbedding, storedEmbedding);
     
     if (similarity > 0.1) {
       results.push({
@@ -137,6 +137,11 @@ export async function semanticSearch(options: SearchOptions): Promise<SearchResu
   db.close();
   
   return results.slice(0, limit * 2).map((r, i) => ({ ...r, vectorRank: i + 1 })).slice(0, limit);
+  } catch (error) {
+    db.close();
+    // Ollama unavailable, fallback to BM25
+    return bm25Search(options);
+  }
 }
 
 export async function hybridSearch(options: SearchOptions): Promise<SearchResult[]> {
@@ -218,7 +223,7 @@ export function timelineSearch(options: SearchOptions): SearchResult[] {
   const params: (string | number)[] = [timeRange.start, timeRange.end];
   
   if (type) {
-    sql += ' AND m.memory_type = ?';
+    sql += ' AND m.type = ?';
     params.push(type);
   }
   
